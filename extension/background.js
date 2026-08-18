@@ -96,6 +96,26 @@ async function pendingReplies() {
   }
 }
 
+/**
+ * Le ping sonore passe par une page hors écran : un onglet Teams avec lequel on
+ * n'a pas interagi n'a pas le droit de jouer un son.
+ */
+async function playBeep() {
+  try {
+    const existing = await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] });
+    if (existing.length === 0) {
+      await chrome.offscreen.createDocument({
+        url: 'offscreen.html',
+        reasons: ['AUDIO_PLAYBACK'],
+        justification: "Signal sonore à l'arrivée d'une question Teams.",
+      });
+    }
+    await chrome.runtime.sendMessage({ type: 'play-beep' });
+  } catch (e) {
+    console.warn('ping sonore impossible', e);
+  }
+}
+
 function notify(id, title, message) {
   chrome.notifications.create(id, {
     type: 'basic',
@@ -121,6 +141,7 @@ async function handleMessage(payload) {
   // Aperçu de la liste de conversations : le texte est tronqué, on prévient sans
   // écrire de fichier. Le .md sera créé à l'ouverture de la conversation.
   if (payload.partial) {
+    if (config.sound) playBeep();
     if (config.notify) {
       notify(
         `tc-list-${Date.now()}`,
@@ -155,6 +176,8 @@ async function handleMessage(payload) {
       entry.error = String(e.message || e);
     }
   }
+
+  if (config.sound) playBeep();
 
   if (config.notify) {
     const title = `${entry.author} · #${project}`;

@@ -36,6 +36,10 @@ const CHAT_LIST_ITEMS = [
   '[role="treeitem"]',
 ];
 
+// Un aperçu de conversation tient en une ligne ; au-delà, c'est un conteneur.
+const PREVIEW_MAX_CHARS = 400;
+const UNREAD_HINT = /non lus?|unread|nouveau message|new message|messages? non lus?/i;
+
 const AUTHOR_SELECTORS = [
   '[data-tid="message-author-name"]',
   '[data-tid="messageAuthorName"]',
@@ -290,7 +294,7 @@ async function collectImages(container) {
 function send(payload) {
   chrome.runtime.sendMessage({ type: 'teams-message', payload }, (res) => {
     if (chrome.runtime.lastError) return;
-    if (res && res.accepted && state.config.sound) beep();
+    if (res && res.accepted) log('capture acceptée', res);
   });
 }
 
@@ -361,8 +365,15 @@ function scanChatList() {
 
   for (const sel of CHAT_LIST_ITEMS) {
     for (const item of document.querySelectorAll(sel)) {
+      // Un item qui en contient d'autres est un conteneur de liste, pas un aperçu.
+      if (item.querySelector(CHAT_LIST_ITEMS.join(','))) continue;
+
       const raw = textOf(item);
-      if (!raw) continue;
+      if (!raw || raw.length > PREVIEW_MAX_CHARS) continue;
+
+      // Sans marque de non-lu, c'est juste un canal dans la barre latérale.
+      const label = `${item.getAttribute('aria-label') || ''} ${item.className || ''}`;
+      if (!UNREAD_HINT.test(label)) continue;
       // Ici le nom du canal est dans l'aperçu lui-même.
       if (!channelAllowed(raw, cfg.channels)) continue;
       const listNeedsTag = cfg.requireTag !== false || !cfg.channels || cfg.channels.length === 0;
@@ -392,29 +403,6 @@ function queueScan() {
     scan();
     scanChatList();
   }, SCAN_DEBOUNCE_MS);
-}
-
-/** Deux bips synthétisés : pas de fichier audio à embarquer. */
-function beep() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const now = ctx.currentTime;
-    [0, 0.18].forEach((offset, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = i === 0 ? 880 : 1180;
-      gain.gain.setValueAtTime(0.0001, now + offset);
-      gain.gain.exponentialRampToValueAtTime(0.25, now + offset + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.15);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(now + offset);
-      osc.stop(now + offset + 0.16);
-    });
-    setTimeout(() => ctx.close(), 800);
-  } catch (e) {
-    log('son indisponible', e);
-  }
 }
 
 /* --------------------------------------------------- réponses sortantes --- */

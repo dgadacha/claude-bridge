@@ -6,7 +6,8 @@
   "permissions": [
     "storage",
     "notifications",
-    "tabs"
+    "tabs",
+    "offscreen"
   ],
   "host_permissions": [
     "https://teams.cloud.microsoft/*",
