@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<title>Banc d'essai des réglages</title>
+<link rel="stylesheet" href="../extension/options.css" />
+<script>
+/**
+ * Charge la page de réglages de l'extension avec une API chrome.* bouchonnée,
+ * pour vérifier que les valeurs par défaut s'affichent et que la saisie est
+ * bien enregistrée.
+ */
+const stored = {};
+window.chrome = {
+  storage: {
+    sync: {
+      get: async () => ({ config: stored.config }),
+      set: async (o) => Object.assign(stored, o),
+    },
+    local: { get: (_k, cb) => cb({ log: [] }) },
+    onChanged: { addListener() {} },
+  },
+  runtime: {
+    lastError: null,
+    sendMessage: (msg, cb) => {
+      if (msg.type === 'check-outbox' && cb) cb({ replies: [] });
+      else if (cb) cb({ ok: true });
+    },
+    openOptionsPage() {},
+  },
+  tabs: { query: (_q, cb) => cb([]), create() {} },
+};
+window.__stored = stored;
+</script>
+</head>
+<body>
+<script>
+// On rejoue le corps de la page réelle, puis son script.
+fetch('../extension/options.html')
+  .then((r) => r.text())
+  .then((html) => {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    document.body.innerHTML = doc.body.innerHTML.replace(/<script[\s\S]*?<\/script>/g, '');
+    const s = document.createElement('script');
+    s.src = '../extension/options.js';
+    document.body.append(s);
+  });
+</script>
+</body>
+</html>

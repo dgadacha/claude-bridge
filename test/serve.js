@@ -5,6 +5,7 @@ http.createServer((req, res) => {
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); return res.end('nope'); }
     const type = file.endsWith('.js') ? 'text/javascript'
+      : file.endsWith('.css') ? 'text/css'
       : file.endsWith('.png') ? 'image/png'
       : 'text/html; charset=utf-8';
     res.writeHead(200, { 'Content-Type': type });

@@ -240,6 +240,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return false;
 });
 
+// Sans popup déclaré, le clic sur l'icône ouvre les réglages dans un onglet.
+chrome.action.onClicked.addListener(() => {
+  chrome.runtime.openOptionsPage();
+});
+
 chrome.notifications.onClicked.addListener((id) => {
   chrome.notifications.clear(id);
   chrome.action.setBadgeText({ text: '' });
