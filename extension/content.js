@@ -181,15 +181,23 @@ function pick(container, selectors) {
   return '';
 }
 
+// Les boutons de la barre d'action d'un message portent eux aussi un aria-label.
+const ACTION_LABEL = /option|r[ée]agir|r[ée]pondre|react|reply|more|menu|modifier|supprimer|transf[ée]rer|forward|delete|edit|enregistrer|save|traduire|translate|[ée]pingler|pin/i;
+
 /** Dernier recours : Teams met souvent "Nom, date heure" dans un aria-label. */
 function authorFromAria(container) {
-  const labelled = container.matches('[aria-label]')
-    ? container
-    : container.querySelector('[aria-label]');
-  if (!labelled) return '';
-  const label = labelled.getAttribute('aria-label') || '';
-  const first = label.split(',')[0].trim();
-  return first.length > 1 && first.length < 80 ? first : '';
+  const candidates = container.matches('[aria-label]')
+    ? [container, ...container.querySelectorAll('[aria-label]')]
+    : Array.from(container.querySelectorAll('[aria-label]'));
+
+  for (const el of candidates) {
+    if (el.closest('button, a, [role="button"], [role="menu"], [role="menuitem"], [role="toolbar"]')) continue;
+    const label = el.getAttribute('aria-label') || '';
+    if (!label || ACTION_LABEL.test(label)) continue;
+    const first = label.split(',')[0].trim();
+    if (first.length > 1 && first.length < 80) return first;
+  }
+  return '';
 }
 
 /**
@@ -349,6 +357,11 @@ function scan() {
   const candidates = new Set();
   for (const sel of MESSAGE_CONTAINERS) {
     for (const el of document.querySelectorAll(sel)) candidates.add(el);
+  }
+  // Les conteneurs s'emboîtent (un item contient le message) : on ne garde que le
+  // plus interne, sinon le même message est capté à chaque niveau.
+  for (const el of Array.from(candidates)) {
+    if (el.querySelector(MESSAGE_CONTAINERS.join(','))) candidates.delete(el);
   }
   if (candidates.size === 0) candidates.add(document.body);
 

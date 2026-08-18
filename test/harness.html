@@ -52,6 +52,25 @@ function addWithShot(author, body){
   avatar.src = '/test/avatar.png'; avatar.alt = 'avatar';
   last.querySelector('[data-tid="message-body-content"]').append(shot, avatar);
 }
+// Comme teams.cloud.microsoft : un item englobe le message, avec des boutons
+// d'action qui portent eux aussi un aria-label.
+function addNested(author, body){
+  const item = document.createElement('div');
+  item.setAttribute('data-tid','chat-pane-item');
+  const msg = document.createElement('div');
+  msg.className = 'msg';
+  msg.setAttribute('data-tid','chat-pane-message');
+  msg.setAttribute('data-mid', String(Date.now() + (window.__n = (window.__n || 0) + 1)));
+  msg.setAttribute('aria-label', author + ', 16:16');
+  const btn = document.createElement('button');
+  btn.setAttribute('aria-label', 'Plus d’options de message');
+  const content = document.createElement('div');
+  content.id = 'content-' + msg.getAttribute('data-mid');
+  content.textContent = body;
+  msg.append(btn, content);
+  item.append(msg);
+  document.getElementById('pane').appendChild(item);
+}
 function add(author, body, mid){
   const el = document.createElement('div');
   el.className = 'msg';
@@ -75,6 +94,7 @@ setTimeout(() => {
   add('Marc Dupont', '#claude #monsite comment on gère la synchro Splio quand le client n\'a pas d\'email ?');
   add('Marc Dupont', '#claude question sans projet');
   addWithShot('Marc Dupont', '#claude #optic le bouton reste grisé, regarde :');
+  addNested('Dylan Gadacha', '#monprojet message imbriqué, une seule capture attendue');
   // Historique rechargé : id horodaté vieux de 3 jours → doit être écarté.
   add('Marc Dupont', '#claude #monprojet vieux message rouvert', String(Date.now() - 3 * 86400000));
   addListItem('claude-bridge — Marc Dupont, 14:32, #claude #monapp le scraper tourne toujours ?');
