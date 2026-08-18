@@ -48,6 +48,12 @@ function readJson(file, fallback) {
   }
 }
 
+/** Modèle utilisé pour traiter les questions, réglable depuis la page de configuration. */
+function model(outputDir) {
+  const settings = readJson(path.join(outputDir, '_settings.json'), {});
+  return process.env.CLAUDE_MODEL || settings.model || 'sonnet';
+}
+
 /**
  * Le traitement automatique se pilote depuis la page de configuration
  * (`_settings.json`) ; `AUTORUN=0` dans l'environnement le coupe quoi qu'il arrive.
@@ -124,6 +130,10 @@ function buildPrompt({ questionFile, project, dir, author, channel, outputDir, b
     `Projet : #${project} → ${dir}`,
     branch ? `Tu travailles sur la branche git ${branch}.` : `Branche git : ${note || 'inchangée'}.`,
     '',
+    "Proportionne l'effort à la question : une question factuelle se répond en lisant le",
+    "code concerné, sans explorer tout le dépôt ni lancer les tests. Les étapes ci-dessous",
+    'ne sont obligatoires que si la question demande une correction.',
+    '',
     'Marche à suivre :',
     `1. Lis ${questionFile}. S'il contient une section "## Captures", ouvre les images :`,
     '   la question est souvent dans la capture.',
@@ -153,8 +163,10 @@ function buildPrompt({ questionFile, project, dir, author, channel, outputDir, b
 /* ------------------------------------------------------------------- run --- */
 
 function spawnClaude({ dir, prompt, sessionId, outputDir }) {
+  const choix = model(outputDir);
   const args = [
     '-p', prompt,
+    ...(choix && choix !== 'default' ? ['--model', choix] : []),
     '--output-format', 'json',
     '--permission-mode', 'acceptEdits',
     '--append-system-prompt', GUARDRAILS,
@@ -271,4 +283,4 @@ function enqueue(entry) {
   queues.set(entry.project, next);
 }
 
-module.exports = { enqueue, runs, autorun, projectDir };
+module.exports = { enqueue, runs, autorun, model, projectDir };

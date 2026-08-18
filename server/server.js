@@ -452,6 +452,7 @@ const server = http.createServer((req, res) => {
       port: PORT,
       outputDir: OUTPUT_DIR,
       autorun: runner.autorun(OUTPUT_DIR),
+      model: runner.model(OUTPUT_DIR),
       projects: readProjects(),
       suggestions: suggestProjects(),
       questions: recentQuestions(),
@@ -483,8 +484,13 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && url.pathname === '/settings') {
     return readBody(req)
       .then((body) => {
-        const next = writeSettings({ autorun: Boolean(body.autorun) });
-        console.log(`traitement automatique : ${next.autorun ? 'activé' : 'désactivé'}`);
+        const patch = {};
+        if ('autorun' in body) patch.autorun = Boolean(body.autorun);
+        if ('model' in body) patch.model = String(body.model);
+        const next = writeSettings(patch);
+        console.log(
+          `réglages : traitement ${next.autorun === false ? 'manuel' : 'automatique'}, modèle ${next.model || 'sonnet'}`
+        );
         json(200, { ok: true, settings: next });
       })
       .catch((e) => json(400, { error: String(e.message || e) }));

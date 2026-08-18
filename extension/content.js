@@ -65,7 +65,7 @@ const MAX_IMAGES = 4;
 const IMAGE_MAX_WIDTH = 1600;
 const NOT_A_SCREENSHOT = /avatar|profilepicture|profile-picture|emoji|sticker|reaction|presence|giphy-preview/i;
 
-const OUTBOX_POLL_MS = 20000;
+const OUTBOX_POLL_MS = 4000;
 
 // Zone de saisie du message, du plus spécifique au plus générique.
 const COMPOSE_BOX = [

@@ -23,6 +23,46 @@ const MAX_SEEN = 500;
 const MAX_LOG = 50;
 const DUPLICATE_WINDOW_MS = 30 * 60 * 1000;
 
+/**
+ * Empreinte tolérante à la mise en forme : Teams rend le markdown, donc le texte
+ * relu à l'écran ne ressemble pas exactement à celui qui a été envoyé.
+ */
+function fingerprint(text) {
+  return String(text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160);
+}
+
+/**
+ * Les réponses déposées par le pont réapparaissent dans le canal : sans cette
+ * mémoire, elles seraient relues comme de nouvelles questions — et avec l'envoi
+ * automatique, le pont se répondrait à lui-même.
+ */
+async function rememberOwnReply(text) {
+  const key = fingerprint(text);
+  if (!key) return;
+  const { ownReplies = [] } = await chrome.storage.local.get('ownReplies');
+  const now = Date.now();
+  const fresh = ownReplies.filter((r) => now - r.at < DUPLICATE_WINDOW_MS);
+  fresh.push({ key, at: now });
+  await chrome.storage.local.set({ ownReplies: fresh.slice(-100) });
+}
+
+async function isOwnReply(text) {
+  const key = fingerprint(text);
+  if (!key) return false;
+  const { ownReplies = [] } = await chrome.storage.local.get('ownReplies');
+  const now = Date.now();
+  return ownReplies.some(
+    (r) => now - r.at < DUPLICATE_WINDOW_MS && (r.key === key || key.startsWith(r.key) || r.key.startsWith(key))
+  );
+}
+
 async function getConfig() {
   const { config } = await chrome.storage.sync.get('config');
   return { ...DEFAULT_CONFIG, ...(config || {}) };
@@ -148,12 +188,10 @@ async function handleMessage(payload) {
   if (!authorMatches(payload.author, config.authors)) {
     return { accepted: false, reason: 'auteur non surveillé' };
   }
-  const fingerprint = String(payload.body || '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 200);
-  if (!(await remember(payload.id, fingerprint))) {
+  if (await isOwnReply(payload.body)) {
+    return { accepted: false, reason: 'réponse déposée par le pont' };
+  }
+  if (!(await remember(payload.id, fingerprint(payload.body)))) {
     return { accepted: false, reason: 'déjà vu' };
   }
 
@@ -261,7 +299,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg.type === 'fetch-reply') {
     api(`/outbox/${encodeURIComponent(msg.id)}`)
-      .then(sendResponse)
+      .then(async (reply) => {
+        // À retenir avant le dépôt : ce texte va réapparaître dans le canal.
+        if (reply && reply.text) await rememberOwnReply(reply.text);
+        sendResponse(reply);
+      })
       .catch((e) => sendResponse({ error: String(e.message || e) }));
     return true;
   }

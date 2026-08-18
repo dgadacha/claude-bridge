@@ -92,6 +92,15 @@
       <input type="checkbox" id="autorun" />
       <span>Lancer Claude automatiquement à l'arrivée d'une question</span>
     </label>
+    <label class="field" style="margin-top:12px">
+      <span>Modèle utilisé pour traiter les questions</span>
+      <select id="model">
+        <option value="haiku">Haiku — le plus rapide, pour des questions simples</option>
+        <option value="sonnet">Sonnet — équilibré (recommandé)</option>
+        <option value="opus">Opus — le plus capable, plus lent et plus cher</option>
+      </select>
+    </label>
+
     <p class="hint">
       Décoché, les questions restent en <code>nouveau</code> et attendent un <code>/teams</code>
       dans la conversation du projet. Les réponses passent toujours par la file : c'est toi qui
@@ -249,6 +258,7 @@ async function refresh() {
     $('state').textContent = `en écoute · ${s.questions.length} question(s)`;
     $('paths').textContent = `${s.outputDir} · port ${s.port}`;
     $('autorun').checked = s.autorun;
+    if (document.activeElement !== $('model')) $('model').value = s.model || 'sonnet';
 
     suggestions = s.suggestions || [];
     $('suggestions').replaceChildren(...suggestions.map((d) => {
@@ -282,6 +292,13 @@ async function refresh() {
 
 $('add').addEventListener('click', () => $('projects').append(projectRow()));
 $('save').addEventListener('click', saveProjects);
+$('model').addEventListener('change', () =>
+  api('/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: $('model').value }),
+  }).catch(() => {})
+);
 $('autorun').addEventListener('change', () =>
   api('/settings', {
     method: 'POST',
