@@ -23,7 +23,7 @@ window.chrome = {
     onMessage: { addListener() {} },    // dépôt des réponses déclenché depuis le popup
     lastError: null,
     sendMessage(msg, cb) {
-      if (msg.type === 'get-config') return cb({ enabled:true, trigger:'#claude', sound:false, debug:true, watchList:true, maxAgeMin:15, channels:['claude-bridge'], requireTag:false, autoSend:false, images:true });
+      if (msg.type === 'get-config') return cb({ enabled:true, trigger:'#claude', sound:false, debug:true, watchList:true, maxAgeMin:15, channels:['claude-bridge'], requireTag:false, autoSend:true, images:true });
       if (msg.type === 'check-outbox') return cb({ replies: window.__outbox || [] });
       if (msg.type === 'fetch-reply') return cb({
         id: 'r1', project: 'monprojet', channel: 'claude-bridge',
@@ -119,6 +119,11 @@ document.getElementById('box').addEventListener('paste', (e) => {
 window.__pasted = [];
 document.getElementById('box').addEventListener('paste', (e) => {
   window.__pasted.push(...Array.from(e.clipboardData.files).map((f) => `${f.name} (${f.type}, ${f.size}o)`));
+});
+document.getElementById('sendBtn').addEventListener('click', () => {
+  box.dataset.accepte = '0';
+  box.textContent = '';           // Teams vide la zone quand le message part
+  window.__envoye = true;
 });
 document.getElementById('switch').addEventListener('click', () => {
   document.getElementById('chan').textContent = 'général';

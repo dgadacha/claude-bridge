@@ -30,8 +30,10 @@ n'est lu.
 | 7 | Relecture et **clic sur Envoyer** | vous |
 | 8 | Question marquée `repondu`, ligne cochée dans `INBOX.md` | automatique |
 
-L'étape 7 est manuelle par défaut : le message part à un tiers en votre nom. Un réglage
-**Envoi automatique** existe pour fermer la boucle entièrement.
+L'étape 7 est manuelle par défaut : le message part à un tiers en votre nom. Le réglage
+**Envoi automatique** la supprime — la réponse part alors seule, sans relecture. Si
+l'envoi échoue, le message reste dans la zone de saisie : rien n'est perdu, rien n'est
+marqué comme envoyé.
 
 ## Ce qu'il y a dans la boîte
 
@@ -106,7 +108,7 @@ manuel.
 | Tag déclencheur | `#claude` | Utilisé seulement si « Exiger le tag » est coché. |
 | Ignorer les messages de plus de | 15 min | Évite de rejouer l'historique quand une vieille conversation est rouverte. |
 | Aperçus non lus | coché | Ping aussi quand le message apparaît dans la liste de conversations sans être ouvert. |
-| Envoi automatique | décoché | Coché, l'extension clique Envoyer elle-même. |
+| Envoi automatique | décoché | Coché, l'extension envoie la réponse elle-même, sans relecture. Elle attend 5 s quand il y a une pièce jointe, le temps du téléversement, et ne considère le message parti que si la zone de saisie s'est vidée. |
 | Collègues surveillés | vide | Filtre supplémentaire par nom d'auteur. |
 
 ## Format d'une question

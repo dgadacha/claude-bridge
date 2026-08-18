@@ -78,9 +78,13 @@ const COMPOSE_BOX = [
 const SEND_BUTTON = [
   '[data-tid="sendMessageCommands"] button',
   '[data-tid="newMessageCommandBar-send"]',
+  'button[data-tid*="send" i]',
+  '[data-tid="send-message-button"]',
   'button[name="send"]',
   'button[aria-label*="Envoyer" i]',
+  'button[title*="Envoyer" i]',
   'button[aria-label*="Send" i]',
+  'button[title*="Send" i]',
 ];
 
 const state = {
@@ -646,15 +650,47 @@ async function prepareReply(reply) {
   log('réponse préparée dans le canal', reply.id, files.map((f) => f.name));
 
   if (state.config.autoSend) {
-    // Laisse à Teams le temps de finir l'envoi de la pièce jointe.
-    setTimeout(
-      () => {
-        const btn = sendButton();
-        if (btn) btn.click();
-        else log('bouton Envoyer introuvable');
-      },
-      files.length ? 4000 : 400
+    // Laisse à Teams le temps de téléverser la pièce jointe avant d'envoyer.
+    setTimeout(() => autoSend(reply, box), files.length ? 5000 : 600);
+  }
+}
+
+/** Entrée sans Maj : le raccourci d'envoi de Teams, si le bouton reste introuvable. */
+function pressEnter(box) {
+  for (const type of ['keydown', 'keypress', 'keyup']) {
+    box.dispatchEvent(
+      new KeyboardEvent(type, {
+        key: 'Enter',
+        code: 'Enter',
+        keyCode: 13,
+        which: 13,
+        bubbles: true,
+        cancelable: true,
+      })
     );
+  }
+}
+
+/**
+ * Envoie la réponse et vérifie qu'elle est bien partie : la zone de saisie se vide
+ * quand Teams accepte le message. Sans cette preuve, on ne marque rien comme envoyé
+ * et le message reste dans la zone, prêt à être envoyé à la main.
+ */
+async function autoSend(reply, box) {
+  const btn = sendButton();
+  if (btn) btn.click();
+  else {
+    log('bouton Envoyer introuvable, tentative avec Entrée');
+    box.focus();
+    pressEnter(box);
+  }
+
+  const parti = await new Promise((resolve) => setTimeout(() => resolve(!textOf(box)), 1200));
+  if (parti) {
+    log('réponse envoyée automatiquement', reply.id);
+    chrome.runtime.sendMessage({ type: 'reply-sent', id: reply.id }, () => {});
+  } else {
+    log("l'envoi automatique n'a pas abouti, le message attend dans la zone de saisie");
   }
 }
 
