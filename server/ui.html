@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Claude Bridge</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #14161a; --panel: #1c1f26; --line: #2b2f38; --text: #e7e9ee;
+    --muted: #99a0ac; --accent: #6b8afd; --ok: #5fd39a; --ko: #ff7b72; --warn: #e3b341;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 20px 60px;
+    font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  main { max-width: 860px; margin: 0 auto; }
+  header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; }
+  h1 { font-size: 19px; margin: 0; letter-spacing: .2px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 22px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .9px; color: var(--muted); margin: 0 0 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--muted); }
+  .dot.ok { background: var(--ok); } .dot.ko { background: var(--ko); }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 5px 6px 5px 0; vertical-align: middle; }
+  td.tag { width: 150px; } td.act { width: 34px; text-align: right; }
+  input[type="text"] {
+    width: 100%; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--line);
+    background: #0f1114; color: var(--text); font: inherit;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+  input.bad { border-color: var(--ko); }
+  input.good { border-color: #2f5c45; }
+  button {
+    padding: 7px 13px; border-radius: 8px; border: 1px solid var(--line);
+    background: #262a33; color: var(--text); font: inherit; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #0d1220; font-weight: 600; }
+  button.icon { padding: 4px 9px; color: var(--muted); }
+  .row { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
+  .spacer { flex: 1; }
+  .saved { color: var(--ok); font-size: 12px; opacity: 0; transition: opacity .2s; }
+  .saved.show { opacity: 1; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { padding: 9px 0; border-bottom: 1px solid var(--line); }
+  li:last-child { border-bottom: none; }
+  li .who { color: var(--accent); font-weight: 600; }
+  li .meta { color: var(--muted); font-size: 12px; }
+  .empty { color: var(--muted); }
+  .badge { font-size: 11px; padding: 2px 7px; border-radius: 20px; border: 1px solid var(--line); color: var(--muted); }
+  .badge.nouveau { color: var(--accent); border-color: #35406b; }
+  .badge.en_cours { color: var(--warn); border-color: #5a4a1e; }
+  .badge.traite { color: var(--ok); border-color: #2f5c45; }
+  .badge.repondu { color: var(--muted); }
+  .badge.echec_traitement, .badge.projet_inconnu, .badge.echec { color: var(--ko); border-color: #5c2f2f; }
+  .switch { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
+  code { background: #0f1114; padding: 1px 5px; border-radius: 5px; font-size: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Claude Bridge</h1>
+    <span><span class="dot" id="dot"></span> <span id="state" class="meta">connexion…</span></span>
+  </header>
+  <div class="sub" id="paths"></div>
+
+  <section>
+    <h2>Projets</h2>
+    <p class="hint" style="margin-top:0">
+      Le tag écrit dans Teams (<code>#monprojet</code>) et le dossier de code où la session
+      Claude sera lancée. Un projet absent d'ici n'est pas traité automatiquement.
+    </p>
+    <table><tbody id="projects"></tbody></table>
+    <datalist id="suggestions"></datalist>
+    <div class="row">
+      <button id="add">+ Ajouter un projet</button>
+      <span class="spacer"></span>
+      <span class="saved" id="saved">enregistré</span>
+      <button class="primary" id="save">Enregistrer</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Traitement</h2>
+    <label class="switch">
+      <input type="checkbox" id="autorun" />
+      <span>Lancer Claude automatiquement à l'arrivée d'une question</span>
+    </label>
+    <p class="hint">
+      Décoché, les questions restent en <code>nouveau</code> et attendent un <code>/teams</code>
+      dans la conversation du projet. Les réponses passent toujours par la file : c'est toi qui
+      cliques Envoyer dans Teams.
+    </p>
+  </section>
+
+  <section>
+    <h2>Questions</h2>
+    <ul id="questions"><li class="empty">Rien pour l'instant.</li></ul>
+  </section>
+
+  <section>
+    <h2>Réponses en attente d'envoi</h2>
+    <ul id="replies"><li class="empty">Aucune.</li></ul>
+  </section>
+
+  <section>
+    <h2>Derniers traitements</h2>
+    <ul id="runs"><li class="empty">Aucun.</li></ul>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let suggestions = [];
+
+async function api(path, init) {
+  const res = await fetch(path, init);
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.status);
+  return res.json();
+}
+
+/* ------------------------------------------------------------- projets --- */
+
+function projectRow(tag = '', dir = '') {
+  const tr = document.createElement('tr');
+
+  const tdTag = document.createElement('td');
+  tdTag.className = 'tag';
+  const inTag = document.createElement('input');
+  inTag.type = 'text';
+  inTag.placeholder = 'monprojet';
+  inTag.value = tag;
+  tdTag.append(inTag);
+
+  const tdDir = document.createElement('td');
+  const inDir = document.createElement('input');
+  inDir.type = 'text';
+  inDir.placeholder = '/Users/moi/code/mon-projet';
+  inDir.value = dir;
+  inDir.setAttribute('list', 'suggestions');
+  inDir.addEventListener('input', () => checkDir(inDir));
+  tdDir.append(inDir);
+
+  const tdAct = document.createElement('td');
+  tdAct.className = 'act';
+  const del = document.createElement('button');
+  del.className = 'icon';
+  del.textContent = '✕';
+  del.title = 'retirer';
+  del.addEventListener('click', () => tr.remove());
+  tdAct.append(del);
+
+  tr.append(tdTag, tdDir, tdAct);
+  if (dir) checkDir(inDir);
+  return tr;
+}
+
+/**
+ * Le chemin existe-t-il vraiment ? On demande au serveur : la liste d'autocomplétion
+ * ne retient que les dossiers qui portent un marqueur de projet, et beaucoup de
+ * dossiers parfaitement valides n'en ont pas.
+ */
+function checkDir(input) {
+  const value = input.value.trim();
+  clearTimeout(input._timer);
+  if (!value) {
+    input.classList.remove('good', 'bad');
+    return;
+  }
+  input._timer = setTimeout(async () => {
+    try {
+      const { exists } = await api(`/check-dir?path=${encodeURIComponent(value)}`);
+      input.classList.toggle('good', exists);
+      input.classList.toggle('bad', !exists);
+      input.title = exists ? '' : 'dossier introuvable';
+    } catch {
+      input.classList.remove('good', 'bad');
+    }
+  }, 250);
+}
+
+function readProjects() {
+  const out = {};
+  for (const tr of $('projects').querySelectorAll('tr')) {
+    const [tag, dir] = tr.querySelectorAll('input');
+    if (tag.value.trim() && dir.value.trim()) out[tag.value.trim().toLowerCase()] = dir.value.trim();
+  }
+  return out;
+}
+
+async function saveProjects() {
+  try {
+    await api('/projects', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projects: readProjects() }),
+    });
+    $('saved').classList.add('show');
+    setTimeout(() => $('saved').classList.remove('show'), 1600);
+  } catch (e) {
+    $('saved').textContent = `⚠️ ${e.message}`;
+    $('saved').classList.add('show');
+  }
+}
+
+/* --------------------------------------------------------------- état --- */
+
+function badge(status) {
+  const span = document.createElement('span');
+  span.className = `badge ${status || ''}`;
+  span.textContent = (status || '').replace(/_/g, ' ');
+  return span;
+}
+
+function line(title, meta, status) {
+  const li = document.createElement('li');
+  const head = document.createElement('div');
+  const who = document.createElement('span');
+  who.className = 'who';
+  who.textContent = title;
+  head.append(who);
+  if (status) head.append(' ', badge(status));
+  const sub = document.createElement('div');
+  sub.className = 'meta';
+  sub.textContent = meta;
+  li.append(head, sub);
+  return li;
+}
+
+function fill(id, items, empty) {
+  const ul = $(id);
+  if (!items.length) {
+    ul.innerHTML = `<li class="empty">${empty}</li>`;
+    return;
+  }
+  ul.replaceChildren(...items);
+}
+
+async function refresh() {
+  try {
+    const s = await api('/state');
+    $('dot').className = 'dot ok';
+    $('state').textContent = `en écoute · ${s.questions.length} question(s)`;
+    $('paths').textContent = `${s.outputDir} · port ${s.port}`;
+    $('autorun').checked = s.autorun;
+
+    suggestions = s.suggestions || [];
+    $('suggestions').replaceChildren(...suggestions.map((d) => {
+      const o = document.createElement('option');
+      o.value = d;
+      return o;
+    }));
+
+    if (!$('projects').dataset.loaded) {
+      const rows = Object.entries(s.projects).map(([tag, dir]) => projectRow(tag, dir));
+      $('projects').replaceChildren(...(rows.length ? rows : [projectRow()]));
+      $('projects').dataset.loaded = '1';
+    }
+
+    fill('questions', s.questions.map((q) =>
+      line(`${q.author} · #${q.project}`, `${new Date(q.recu).toLocaleString('fr-FR')} — ${q.question}`, q.statut)
+    ), 'Rien pour l\'instant.');
+
+    fill('replies', s.replies.map((r) =>
+      line(`#${r.project}`, (r.attachments.map((a) => a.name).join(', ') || 'sans pièce jointe') + ' — ' + r.text.slice(0, 120))
+    ), 'Aucune.');
+
+    fill('runs', s.runs.map((r) =>
+      line(`#${r.project}`, `${r.branch || 'branche inchangée'} — ${(r.summary || '').slice(0, 160)}`, r.status)
+    ), 'Aucun.');
+  } catch {
+    $('dot').className = 'dot ko';
+    $('state').textContent = 'serveur injoignable';
+  }
+}
+
+$('add').addEventListener('click', () => $('projects').append(projectRow()));
+$('save').addEventListener('click', saveProjects);
+$('autorun').addEventListener('change', () =>
+  api('/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ autorun: $('autorun').checked }),
+  }).catch(() => {})
+);
+
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>

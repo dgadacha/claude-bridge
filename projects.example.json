@@ -1,0 +1,5 @@
+{
+  "_doc": "Copier en projects.json. Correspondance entre le tag #projet écrit dans Teams et le dossier de code où la session Claude sera lancée. Éditable depuis la page de configuration.",
+  "monprojet": "/Users/moi/code/mon-projet",
+  "monsite": "/Users/moi/code/mon-site"
+}

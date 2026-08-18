@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Banc d'essai content.js</title>
+<style>
+body{font:14px system-ui;background:#16181d;color:#e7e9ee;padding:16px;display:flex;gap:16px}
+.col{flex:1}.msg{border:1px solid #2e323b;border-radius:8px;padding:8px;margin-bottom:8px}
+.who{color:#6b8afd;font-weight:600}pre{background:#0f1114;padding:8px;border-radius:8px;white-space:pre-wrap}
+</style></head><body>
+<div class="col"><h3>Faux Teams</h3>
+<div>canal ouvert : <b data-tid="channel-header-title" id="chan">claude-bridge</b>
+<button id="switch">passer sur « général »</button></div>
+<h4>Liste des conversations</h4><div id="list"></div>
+<h4>Conversation ouverte</h4><div id="pane"></div>
+<h4>Zone de saisie</h4>
+<div data-tid="ckeditor"><div contenteditable="true" role="textbox" id="box"
+  style="border:1px solid #2e323b;border-radius:8px;padding:8px;min-height:40px"></div></div>
+<div data-tid="sendMessageCommands"><button id="sendBtn">Envoyer</button></div></div>
+<div class="col"><h3>Captures</h3><pre id="out">[]</pre><div id="phase">phase: priming</div></div>
+<script>
+const captures = [];
+window.chrome = {
+  runtime: {
+    lastError: null,
+    sendMessage(msg, cb) {
+      if (msg.type === 'get-config') return cb({ enabled:true, trigger:'#claude', sound:false, debug:true, watchList:true, maxAgeMin:15, channels:['claude-bridge'], requireTag:false, autoSend:false, images:true });
+      if (msg.type === 'check-outbox') return cb({ replies: window.__outbox || [] });
+      if (msg.type === 'fetch-reply') return cb({
+        id: 'r1', project: 'monprojet', channel: 'claude-bridge',
+        text: "Salut Alex, c'est corrigé en 1.4.2.",
+        attachments: [{ name: 'monprojet-1.4.2.zip', size: 4, base64: 'UEsDBA==' }],
+      });
+      if (msg.type === 'reply-sent') { window.__sent = msg.id; return cb({ ok:true }); }
+      if (msg.type === 'teams-message') { captures.push(msg.payload); render(); return cb({ accepted:true }); }
+    },
+  },
+  storage: { onChanged: { addListener(){} } },
+};
+function render(){ document.getElementById('out').textContent = JSON.stringify(captures, null, 2); }
+function addListItem(label){
+  const el = document.createElement('div');
+  el.className = 'msg';
+  el.setAttribute('data-tid','chat-list-item');
+  el.setAttribute('aria-label', label);
+  el.textContent = label;
+  document.getElementById('list').appendChild(el);
+}
+function addWithShot(author, body){
+  add(author, body);
+  const last = document.getElementById('pane').lastElementChild;
+  const shot = document.createElement('img');
+  shot.src = '/test/shot.png'; shot.alt = 'capture écran fidélité';
+  const avatar = document.createElement('img');
+  avatar.src = '/test/avatar.png'; avatar.alt = 'avatar';
+  last.querySelector('[data-tid="message-body-content"]').append(shot, avatar);
+}
+function add(author, body, mid){
+  const el = document.createElement('div');
+  el.className = 'msg';
+  el.setAttribute('data-tid','chat-pane-message');
+  el.setAttribute('data-mid', mid || String(Date.now() + (window.__n = (window.__n || 0) + 1)));
+  el.innerHTML = '<div class="who" data-tid="message-author-name"></div>'
+               + '<div data-tid="message-body-content"></div>';
+  el.querySelector('[data-tid="message-author-name"]').textContent = author;
+  el.querySelector('[data-tid="message-body-content"]').textContent = body;
+  document.getElementById('pane').appendChild(el);
+}
+// Historique déjà présent au chargement : ne doit PAS déclencher de capture.
+add('Marc Dupont', '#claude #monprojet vieille question de l\'historique');
+add('Sophie Martin', 'salut, tu as vu le ticket ?');
+</script>
+<script src="../extension/content.js"></script>
+<script>
+setTimeout(() => {
+  document.getElementById('phase').textContent = 'phase: live';
+  add('Sophie Martin', 'un message sans hashtag de projet');
+  add('Marc Dupont', '#claude #monsite comment on gère la synchro Splio quand le client n\'a pas d\'email ?');
+  add('Marc Dupont', '#claude question sans projet');
+  addWithShot('Marc Dupont', '#claude #optic le bouton reste grisé, regarde :');
+  // Historique rechargé : id horodaté vieux de 3 jours → doit être écarté.
+  add('Marc Dupont', '#claude #monprojet vieux message rouvert', String(Date.now() - 3 * 86400000));
+  addListItem('claude-bridge — Marc Dupont, 14:32, #claude #monapp le scraper tourne toujours ?');
+  addListItem('Général — Sophie Martin, 14:35, #claude #optic message dans un autre canal');
+}, 7000);
+// Ce que Teams ferait de la pièce jointe collée.
+window.__pasted = [];
+document.getElementById('box').addEventListener('paste', (e) => {
+  window.__pasted.push(...Array.from(e.clipboardData.files).map((f) => `${f.name} (${f.type}, ${f.size}o)`));
+});
+document.getElementById('switch').addEventListener('click', () => {
+  document.getElementById('chan').textContent = 'général';
+  add('Marc Dupont', '#claude #monprojet message posté dans un autre canal');
+});
+</script>
+</body></html>

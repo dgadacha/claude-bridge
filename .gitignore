@@ -1,0 +1,7 @@
+# Correspondance projets → dossiers de code : chemins et noms de clients, reste local.
+projects.json
+
+/tmp/
+
+.DS_Store
+node_modules/

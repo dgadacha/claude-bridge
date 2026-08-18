@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Claude Bridge</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <header>
+    <h1>Claude Bridge</h1>
+    <label class="switch">
+      <input type="checkbox" id="enabled" />
+      <span>Actif</span>
+    </label>
+  </header>
+
+  <section>
+    <label class="field">
+      <span>Canaux surveillés <em>(un par ligne, vide = toutes les conversations)</em></span>
+      <textarea id="channels" rows="2" placeholder="claude-bridge"></textarea>
+    </label>
+
+    <label class="field">
+      <span>Tag déclencheur <em>(seulement si « Exiger le tag » est coché)</em></span>
+      <input type="text" id="trigger" placeholder="#claude" />
+    </label>
+
+    <label class="field">
+      <span>Collègues surveillés <em>(un par ligne, vide = tout le monde)</em></span>
+      <textarea id="authors" rows="3" placeholder="Prénom Nom"></textarea>
+    </label>
+
+    <label class="field">
+      <span>Port du serveur local</span>
+      <input type="number" id="port" min="1" max="65535" />
+    </label>
+
+    <label class="field">
+      <span>Ignorer les messages de plus de <em>(minutes)</em></span>
+      <input type="number" id="maxAgeMin" min="1" max="1440" />
+    </label>
+  </section>
+
+  <section class="toggles">
+    <label><input type="checkbox" id="sound" /> Son</label>
+    <label><input type="checkbox" id="notify" /> Notification</label>
+    <label><input type="checkbox" id="forward" /> Écrire le .md</label>
+    <label><input type="checkbox" id="requireTag" /> Exiger le tag</label>
+    <label><input type="checkbox" id="autoSend" /> Envoi automatique</label>
+    <label><input type="checkbox" id="watchList" /> Aperçus non lus</label>
+    <label><input type="checkbox" id="debug" /> Logs console</label>
+  </section>
+
+  <section class="status">
+    <button id="test">Tester le serveur</button>
+    <button id="config">Projets &amp; traitement</button>
+    <span id="statusText">—</span>
+  </section>
+
+  <section>
+    <h2>Réponses à envoyer</h2>
+    <ul id="outbox"><li class="empty">Aucune réponse en attente.</li></ul>
+  </section>
+
+  <section>
+    <h2>Dernières captures</h2>
+    <ul id="log"><li class="empty">Rien pour l'instant.</li></ul>
+  </section>
+</body>
+</html>
