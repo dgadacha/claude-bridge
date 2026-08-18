@@ -236,6 +236,14 @@ function suggestProjects() {
   }
 }
 
+const DEFAULT_ACK = "Bien reçu, je regarde ça et je reviens vers toi.";
+
+/** Message envoyé dès qu'une question part en traitement. Vide = pas d'accusé. */
+function ackText() {
+  const settings = readSettings();
+  return settings.ackText === undefined ? DEFAULT_ACK : String(settings.ackText).trim();
+}
+
 function readSettings() {
   return readJson(SETTINGS_FILE, {});
 }
@@ -453,6 +461,8 @@ const server = http.createServer((req, res) => {
       outputDir: OUTPUT_DIR,
       autorun: runner.autorun(OUTPUT_DIR),
       model: runner.model(OUTPUT_DIR),
+      effort: runner.effort(OUTPUT_DIR),
+      ackText: ackText(),
       projects: readProjects(),
       suggestions: suggestProjects(),
       questions: recentQuestions(),
@@ -487,9 +497,12 @@ const server = http.createServer((req, res) => {
         const patch = {};
         if ('autorun' in body) patch.autorun = Boolean(body.autorun);
         if ('model' in body) patch.model = String(body.model);
+        if ('effort' in body) patch.effort = String(body.effort);
+        if ('ackText' in body) patch.ackText = String(body.ackText);
         const next = writeSettings(patch);
         console.log(
-          `réglages : traitement ${next.autorun === false ? 'manuel' : 'automatique'}, modèle ${next.model || 'sonnet'}`
+          `réglages : traitement ${next.autorun === false ? 'manuel' : 'automatique'},` +
+            ` modèle ${next.model || 'défaut'}, effort ${next.effort || 'défaut'}`
         );
         json(200, { ok: true, settings: next });
       })
@@ -571,12 +584,19 @@ const server = http.createServer((req, res) => {
         json(200, { ok: true, file: rel, shots });
 
         // Traitement par une session Claude Code lancée dans le dossier du projet.
+        const project = safeProject(entry.project);
         runner.enqueue({
-          project: safeProject(entry.project),
+          project,
           questionFile: file,
           outputDir: OUTPUT_DIR,
           author: entry.author,
           channel: entry.channel,
+          ack: () => {
+            const texte = ackText();
+            if (!texte) return;
+            createReply({ project, text: texte, channel: entry.channel });
+            console.log(`[${new Date().toLocaleTimeString('fr-FR')}] accusé de réception déposé`);
+          },
         });
       } catch (e) {
         console.error('écriture impossible', e);

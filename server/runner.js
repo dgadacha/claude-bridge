@@ -48,10 +48,18 @@ function readJson(file, fallback) {
   }
 }
 
-/** Modèle utilisé pour traiter les questions, réglable depuis la page de configuration. */
+/**
+ * Modèle et effort de raisonnement. Par défaut on n'impose rien : la session hérite
+ * de la configuration de Claude Code, comme une session lancée à la main.
+ */
 function model(outputDir) {
   const settings = readJson(path.join(outputDir, '_settings.json'), {});
-  return process.env.CLAUDE_MODEL || settings.model || 'sonnet';
+  return process.env.BRIDGE_MODEL || settings.model || 'default';
+}
+
+function effort(outputDir) {
+  const settings = readJson(path.join(outputDir, '_settings.json'), {});
+  return process.env.BRIDGE_EFFORT || settings.effort || 'default';
 }
 
 /**
@@ -163,10 +171,12 @@ function buildPrompt({ questionFile, project, dir, author, channel, outputDir, b
 /* ------------------------------------------------------------------- run --- */
 
 function spawnClaude({ dir, prompt, sessionId, outputDir }) {
-  const choix = model(outputDir);
+  const choixModele = model(outputDir);
+  const choixEffort = effort(outputDir);
   const args = [
     '-p', prompt,
-    ...(choix && choix !== 'default' ? ['--model', choix] : []),
+    ...(choixModele && choixModele !== 'default' ? ['--model', choixModele] : []),
+    ...(choixEffort && choixEffort !== 'default' ? ['--effort', choixEffort] : []),
     '--output-format', 'json',
     '--permission-mode', 'acceptEdits',
     '--append-system-prompt', GUARDRAILS,
@@ -223,6 +233,17 @@ async function runOne(entry) {
   }
 
   setStatus(questionFile, 'en_cours');
+
+  // Accusé de réception : la session prend des dizaines de secondes, autant le dire
+  // tout de suite plutôt que laisser le canal muet.
+  if (typeof entry.ack === 'function') {
+    try {
+      await entry.ack();
+    } catch (e) {
+      console.warn("accusé de réception non déposé", e.message || e);
+    }
+  }
+
   const slug = path.basename(questionFile, '.md');
   const { branch, note } = await prepareBranch(dir, slug);
   record.branch = branch;
@@ -231,7 +252,13 @@ async function runOne(entry) {
   const sessionId = known ? { id: known, resume: true } : { id: crypto.randomUUID(), resume: false };
 
   const prompt = buildPrompt({ ...entry, dir, branch, note });
-  console.log(`→ traitement de #${project} dans ${dir}${branch ? ` (branche ${branch})` : ''}`);
+  const reglages = [model(outputDir), effort(outputDir)]
+    .filter((v) => v && v !== 'default')
+    .join(' · ');
+  console.log(
+    `→ traitement de #${project} dans ${dir}${branch ? ` (branche ${branch})` : ''}` +
+      (reglages ? ` [${reglages}]` : '')
+  );
 
   let res = await spawnClaude({ dir, prompt, sessionId, outputDir });
   // Une session reprise peut avoir disparu (nettoyage, autre machine) : on repart neuf.
@@ -283,4 +310,4 @@ function enqueue(entry) {
   queues.set(entry.project, next);
 }
 
-module.exports = { enqueue, runs, autorun, model, projectDir };
+module.exports = { enqueue, runs, autorun, model, effort, projectDir };

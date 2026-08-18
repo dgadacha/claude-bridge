@@ -66,24 +66,32 @@ cp projects.example.json projects.json
 
 Variables d'environnement : `PORT` (défaut `8795`), `OUTPUT_DIR` (défaut
 `~/Documents/teams-inbox`), `AUTORUN=0` pour couper le traitement automatique,
-`CLAUDE_MODEL` pour imposer un modèle, `RUN_TIMEOUT_MS` (défaut 20 min), `CLAUDE_BIN`
+`BRIDGE_MODEL` et `BRIDGE_EFFORT` pour imposer modèle et effort, `RUN_TIMEOUT_MS` (défaut 20 min), `CLAUDE_BIN`
 si l'exécutable `claude` n'est pas dans le `PATH`.
 
 ## Temps de réponse
 
-Une question simple prend une minute environ, dont l'essentiel est la session Claude
-elle-même. Les leviers, par ordre d'effet :
+Une question prend le temps de la session Claude — quelques dizaines de secondes.
+Pour que l'attente ne soit pas silencieuse, un **message d'attente** est envoyé dès
+que le traitement démarre (« Bien reçu, je regarde ça et je reviens vers toi. »),
+modifiable ou désactivable depuis la page de configuration. Il n'a d'intérêt qu'avec
+l'envoi automatique, sinon il attend lui aussi votre clic.
 
-- **Le modèle**, réglable sur la page de configuration. Haiku répond en quelques
-  secondes aux questions factuelles ; Sonnet est le défaut ; Opus est le plus capable
-  mais compte plusieurs dizaines de secondes et coûte nettement plus cher.
+Les leviers sur la durée, par ordre d'effet :
+
+- **Modèle et effort de raisonnement**, réglables sur la page de configuration. Par
+  défaut le pont n'impose rien : la session hérite de votre configuration Claude Code,
+  exactement comme une session lancée à la main. Choisir Haiku, ou un effort plus bas,
+  accélère nettement les questions factuelles.
 - **La consigne d'effort** donnée à la session : une question factuelle se répond en
   lisant le code concerné, sans explorer tout le dépôt ni lancer les tests.
 - **Le dépôt de la réponse** est vérifié toutes les 4 secondes, et immédiatement quand
   l'onglet Teams reprend le focus.
 
 Le journal de chaque traitement (`<OUTPUT_DIR>/_runs/`) contient la durée réelle, le
-nombre de tours et le coût.
+nombre de tours, le modèle utilisé et le coût estimé. Ce coût est une équivalence API
+affichée par le CLI : une session lancée sous abonnement consomme le quota de
+l'abonnement, pas une facture à l'usage.
 
 Pour qu'il tourne en permanence (macOS) : adapter le chemin dans `claude-bridge.plist`,
 puis
