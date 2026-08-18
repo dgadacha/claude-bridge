@@ -213,6 +213,9 @@ function spawnClaude({ dir, prompt, sessionId, outputDir }) {
     '--append-system-prompt', GUARDRAILS,
     '--add-dir', outputDir,
     '--add-dir', BRIDGE_DIR,
+    // Aucun serveur MCP : le run n'a besoin que du code du projet, et chaque serveur
+    // coûte du démarrage et des définitions d'outils dans le contexte.
+    '--strict-mcp-config',
     '--allowedTools', 'Read', 'Glob', 'Grep', 'Edit', 'Write', 'Bash',
   ];
   if (sessionId.resume) args.push('--resume', sessionId.id);
