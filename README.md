@@ -239,8 +239,17 @@ lancement), le dépôt avec du travail en cours, et le projet inconnu.
 
 ## Limites connues
 
-- **Teams web uniquement**, avec l'onglet ouvert dans Chrome. L'application de bureau
-  demanderait de passer par Microsoft Graph (enregistrement d'application côté tenant).
+- **Teams web uniquement**, avec l'onglet ouvert dans Chrome — épinglez-le pour éviter
+  qu'il soit gelé en arrière-plan. Il n'a pas besoin d'être au premier plan.
+- **Pourquoi lire le DOM plutôt que Microsoft Graph ?** Graph serait plus robuste, et
+  les API Teams ne sont plus facturées depuis le 25 août 2025. Le blocage est ailleurs :
+  lire les messages demande `ChannelMessage.Read.All`, donc un **consentement
+  administrateur** sur le tenant, plus une inscription d'application. L'extension, elle,
+  ne dépend de personne. Le reste du pont (format `.md`, file de réponses, runner, page
+  de configuration) est indépendant de la source : la bascule reste possible plus tard.
+  À noter pour ce jour-là : l'envoi dans un canal n'existe qu'en permission déléguée
+  (`ChannelMessage.Send`), et joindre un fichier suppose de le téléverser d'abord dans
+  le SharePoint du canal.
 - Si la conversation n'est pas ouverte, le ping vient de l'aperçu de la liste : la
   notification signale un non-lu et le `.md` n'est écrit qu'à l'ouverture du canal.
 - Les messages qui n'exposent pas d'horodatage dans leur identifiant DOM échappent au
