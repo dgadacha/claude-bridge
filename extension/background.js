@@ -21,6 +21,7 @@ const DEFAULT_CONFIG = {
 
 const MAX_SEEN = 500;
 const MAX_LOG = 50;
+const DUPLICATE_WINDOW_MS = 30 * 60 * 1000;
 
 async function getConfig() {
   const { config } = await chrome.storage.sync.get('config');
@@ -54,11 +55,25 @@ function parse(body, trigger) {
   return { project, question, prefix };
 }
 
-async function remember(id) {
-  const { seen = [] } = await chrome.storage.local.get('seen');
+/**
+ * Deux garde-fous contre les doublons, qui survivent au rechargement de l'onglet :
+ * l'identifiant du message, et une empreinte du contenu — Teams expose parfois le
+ * même message sous deux identifiants, et l'identifiant seul ne suffit pas.
+ */
+async function remember(id, fingerprint) {
+  const { seen = [], recent = [] } = await chrome.storage.local.get(['seen', 'recent']);
+  const now = Date.now();
+  const fresh = recent.filter((r) => now - r.at < DUPLICATE_WINDOW_MS);
+
   if (seen.includes(id)) return false;
+  if (fingerprint && fresh.some((r) => r.key === fingerprint)) return false;
+
   seen.push(id);
-  await chrome.storage.local.set({ seen: seen.slice(-MAX_SEEN) });
+  if (fingerprint) fresh.push({ key: fingerprint, at: now });
+  await chrome.storage.local.set({
+    seen: seen.slice(-MAX_SEEN),
+    recent: fresh.slice(-MAX_SEEN),
+  });
   return true;
 }
 
@@ -133,8 +148,14 @@ async function handleMessage(payload) {
   if (!authorMatches(payload.author, config.authors)) {
     return { accepted: false, reason: 'auteur non surveillé' };
   }
-  const key = `${payload.author}|${payload.id}`;
-  if (!(await remember(key))) return { accepted: false, reason: 'déjà vu' };
+  const fingerprint = String(payload.body || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200);
+  if (!(await remember(payload.id, fingerprint))) {
+    return { accepted: false, reason: 'déjà vu' };
+  }
 
   const { project, question, prefix } = parse(payload.body, config.trigger);
 
