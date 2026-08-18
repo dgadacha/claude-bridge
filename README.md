@@ -47,6 +47,10 @@ L'étape 7 est manuelle par défaut : le message part à un tiers en votre nom. 
 
 Aucune dépendance npm. Node 18+ et Chrome suffisent.
 
+Domaines Teams pris en charge : `teams.cloud.microsoft` (le domaine actuel),
+`teams.microsoft.com` et `teams.live.com`. Si votre Teams tourne ailleurs, ajoutez-le
+dans `matches` et `host_permissions` du manifeste.
+
 ## Installation
 
 ### 1. Le serveur
@@ -78,7 +82,7 @@ launchctl load ~/Library/LaunchAgents/com.claude-bridge.plist
 2. `chrome://extensions` → activer le **Mode développeur**.
 3. **Charger l'extension non empaquetée** → choisir le dossier `extension/`.
 4. Cliquer sur l'icône de l'extension et vérifier que **Tester le serveur** répond.
-5. Recharger l'onglet `teams.microsoft.com`.
+5. Recharger l'onglet Teams.
 
 ### 3. Les projets
 

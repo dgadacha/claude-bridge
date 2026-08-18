@@ -111,7 +111,12 @@ function renderOutbox() {
 }
 
 function prepare(reply, meta) {
-  chrome.tabs.query({ url: ['https://teams.microsoft.com/*', 'https://teams.live.com/*'] }, (tabs) => {
+  const TEAMS = [
+    'https://teams.cloud.microsoft/*',
+    'https://teams.microsoft.com/*',
+    'https://teams.live.com/*',
+  ];
+  chrome.tabs.query({ url: TEAMS }, (tabs) => {
     const tab = tabs && tabs[0];
     if (!tab) {
       meta.textContent = '⚠️ aucun onglet Teams ouvert';

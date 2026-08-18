@@ -3,26 +3,46 @@
   "name": "Claude Bridge",
   "version": "1.0.0",
   "description": "Ping quand un collègue poste dans le canal Teams dédié, dépose la question en .md local, et renvoie la réponse de Claude avec sa pièce jointe.",
-  "permissions": ["storage", "notifications", "tabs"],
+  "permissions": [
+    "storage",
+    "notifications",
+    "tabs"
+  ],
   "host_permissions": [
+    "https://teams.cloud.microsoft/*",
     "https://teams.microsoft.com/*",
     "https://teams.live.com/*",
     "http://localhost/*",
     "http://127.0.0.1/*"
   ],
-  "background": { "service_worker": "background.js" },
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
-      "matches": ["https://teams.microsoft.com/*", "https://teams.live.com/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://teams.cloud.microsoft/*",
+        "https://teams.microsoft.com/*",
+        "https://teams.live.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle",
       "all_frames": true
     }
   ],
-  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
   "action": {
     "default_title": "Claude Bridge",
-    "default_icon": { "128": "icon128.png" }
+    "default_icon": {
+      "128": "icon128.png"
+    }
   },
-  "icons": { "128": "icon128.png" }
+  "icons": {
+    "128": "icon128.png"
+  }
 }
