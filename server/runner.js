@@ -63,6 +63,16 @@ function effort(outputDir) {
 }
 
 /**
+ * Reprendre la session d'un projet recharge tout l'historique : le contexte gonfle à
+ * chaque question et le temps de réponse avec lui. Par défaut chaque question part
+ * donc d'une session neuve ; la reprise ne vaut que pour un échange qui se poursuit.
+ */
+function contextMode(outputDir) {
+  const settings = readJson(path.join(outputDir, '_settings.json'), {});
+  return process.env.BRIDGE_CONTEXT || settings.context || 'neuve';
+}
+
+/**
  * Le traitement automatique se pilote depuis la page de configuration
  * (`_settings.json`) ; `AUTORUN=0` dans l'environnement le coupe quoi qu'il arrive.
  */
@@ -130,11 +140,34 @@ async function prepareBranch(dir, slug) {
 
 /* ---------------------------------------------------------------- prompt --- */
 
+function questionText(file) {
+  try {
+    const md = fs.readFileSync(file, 'utf8');
+    const corps = md.split(/^# .*$/m)[1] || '';
+    return corps.split('##')[0].trim().slice(0, 2000);
+  } catch {
+    return '';
+  }
+}
+
 function buildPrompt({ questionFile, project, dir, author, channel, outputDir, branch, note }) {
+  const texte = questionText(questionFile);
+  const captures = (() => {
+    try {
+      return fs.readFileSync(questionFile, 'utf8').includes('## Captures');
+    } catch {
+      return false;
+    }
+  })();
+
   return [
-    `Question reçue sur Teams${author ? ` de ${author}` : ''}${channel ? ` (canal ${channel})` : ''}.`,
+    `Question reçue sur Teams${author ? ` de ${author}` : ''}${channel ? ` (canal ${channel})` : ''} :`,
     '',
-    `Fichier de la question : ${questionFile}`,
+    texte ? `« ${texte} »` : '(voir le fichier)',
+    '',
+    captures
+      ? `Le message contient des captures d'écran : ouvre-les depuis ${questionFile}.`
+      : `Fichier de la question : ${questionFile}`,
     `Projet : #${project} → ${dir}`,
     branch ? `Tu travailles sur la branche git ${branch}.` : `Branche git : ${note || 'inchangée'}.`,
     '',
@@ -143,18 +176,16 @@ function buildPrompt({ questionFile, project, dir, author, channel, outputDir, b
     'ne sont obligatoires que si la question demande une correction.',
     '',
     'Marche à suivre :',
-    `1. Lis ${questionFile}. S'il contient une section "## Captures", ouvre les images :`,
-    '   la question est souvent dans la capture.',
-    '2. Cherche la réponse dans le code de ce dépôt, pas de mémoire.',
-    '3. Si une correction est nécessaire, fais-la et vérifie-la (tests, lint) si le projet le permet.',
+    '1. Cherche la réponse dans le code de ce dépôt, pas de mémoire.',
+    '2. Si une correction est nécessaire, fais-la et vérifie-la (tests, lint) si le projet le permet.',
     '   Ne commit pas, ne push pas : le diff sera relu.',
-    '4. Si un livrable est attendu (plugin, build), construis-le :',
+    '3. Si un livrable est attendu (plugin, build), construis-le :',
     `   ${path.join(BRIDGE_DIR, 'bin/zip-plugin.sh')} <dossier> <nom-version> [--exclude motif]`,
-    '5. Rédige la réponse destinée au client dans un fichier temporaire : en français,',
+    '4. Rédige la réponse destinée au client dans un fichier temporaire : en français,',
     '   à la première personne, ton direct et humain, sans tiret cadratin ni marqueur d\'IA.',
     '   Explique le symptôme, ce qui a été corrigé, et ce que le client doit faire.',
     '   Pas de jargon interne, pas de chemins de fichiers absolus, pas de code sauf si utile.',
-    '6. Dépose la réponse dans la file :',
+    '5. Dépose la réponse dans la file :',
     `   node ${path.join(BRIDGE_DIR, 'bin/reply.js')} --project ${project} \\`,
     '     --text-file <ta-reponse.md> [--attach <livrable.zip>] \\',
     `     --question ${path.relative(outputDir, questionFile)}`,
@@ -182,7 +213,7 @@ function spawnClaude({ dir, prompt, sessionId, outputDir }) {
     '--append-system-prompt', GUARDRAILS,
     '--add-dir', outputDir,
     '--add-dir', BRIDGE_DIR,
-    '--allowedTools', 'Read', 'Glob', 'Grep', 'Edit', 'Write', 'Bash', 'TodoWrite',
+    '--allowedTools', 'Read', 'Glob', 'Grep', 'Edit', 'Write', 'Bash',
   ];
   if (sessionId.resume) args.push('--resume', sessionId.id);
   else args.push('--session-id', sessionId.id);
@@ -248,7 +279,8 @@ async function runOne(entry) {
   const { branch, note } = await prepareBranch(dir, slug);
   record.branch = branch;
 
-  const known = sessionFor(outputDir, project);
+  const reprise = contextMode(outputDir) === 'reprise';
+  const known = reprise ? sessionFor(outputDir, project) : null;
   const sessionId = known ? { id: known, resume: true } : { id: crypto.randomUUID(), resume: false };
 
   const prompt = buildPrompt({ ...entry, dir, branch, note });
@@ -310,4 +342,4 @@ function enqueue(entry) {
   queues.set(entry.project, next);
 }
 
-module.exports = { enqueue, runs, autorun, model, effort, projectDir };
+module.exports = { enqueue, runs, autorun, model, effort, contextMode, projectDir };

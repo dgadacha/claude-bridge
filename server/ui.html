@@ -115,6 +115,14 @@
     </label>
 
     <label class="field">
+      <span>Contexte entre les questions</span>
+      <select id="context">
+        <option value="neuve">Session neuve à chaque question — le plus rapide</option>
+        <option value="reprise">Reprendre la session du projet — se souvient des échanges précédents, mais ralentit à chaque question</option>
+      </select>
+    </label>
+
+    <label class="field">
       <span>Message d'attente <em>(envoyé dès qu'une question part en traitement ; vide = aucun)</em></span>
       <input type="text" id="ackText" placeholder="Bien reçu, je regarde ça et je reviens vers toi." />
     </label>
@@ -285,6 +293,7 @@ async function refresh() {
     if (document.activeElement !== $('model')) $('model').value = s.model || 'default';
     if (document.activeElement !== $('effort')) $('effort').value = s.effort || 'default';
     if (document.activeElement !== $('ackText')) $('ackText').value = s.ackText || '';
+    if (document.activeElement !== $('context')) $('context').value = s.context || 'neuve';
 
     suggestions = s.suggestions || [];
     $('suggestions').replaceChildren(...suggestions.map((d) => {
@@ -326,7 +335,7 @@ $('ackText').addEventListener('change', () =>
   }).catch(() => {})
 );
 
-for (const champ of ['model', 'effort']) {
+for (const champ of ['model', 'effort', 'context']) {
   $(champ).addEventListener('change', () =>
     api('/settings', {
       method: 'POST',

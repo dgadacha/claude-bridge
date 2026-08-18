@@ -79,6 +79,9 @@ l'envoi automatique, sinon il attend lui aussi votre clic.
 
 Les leviers sur la durée, par ordre d'effet :
 
+- **Le contexte** : une session neuve par question (le défaut) évite de recharger
+  l'historique du projet. C'est de loin le premier facteur quand les questions
+  s'enchaînent.
 - **Modèle et effort de raisonnement**, réglables sur la page de configuration. Par
   défaut le pont n'impose rien : la session hérite de votre configuration Claude Code,
   exactement comme une session lancée à la main. Choisir Haiku, ou un effort plus bas,
@@ -220,10 +223,14 @@ quelqu'un d'autre. Les protections en place :
 
 ## Contexte entre les questions
 
-Une session Claude est conservée par projet : la deuxième question sur un projet
-reprend le contexte de la première (`--resume`). Les identifiants sont dans
-`<OUTPUT_DIR>/_sessions.json` ; supprimer une entrée fait repartir ce projet d'un
-contexte vierge.
+Par défaut, **chaque question part d'une session neuve**. Reprendre la session d'un
+projet recharge tout l'historique : le contexte gonfle à chaque question et le temps
+de réponse avec lui — mesuré sur un cas réel, de 160 000 à 540 000 tokens rechargés
+entre la première et la sixième question, et de 30 à 99 secondes de traitement.
+
+Le mode « reprendre la session du projet » reste disponible sur la page de
+configuration, pour un échange qui se poursuit d'une question à l'autre. Les
+identifiants de session sont dans `<OUTPUT_DIR>/_sessions.json`.
 
 ## Dépannage
 

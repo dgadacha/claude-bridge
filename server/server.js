@@ -463,6 +463,7 @@ const server = http.createServer((req, res) => {
       model: runner.model(OUTPUT_DIR),
       effort: runner.effort(OUTPUT_DIR),
       ackText: ackText(),
+      context: runner.contextMode(OUTPUT_DIR),
       projects: readProjects(),
       suggestions: suggestProjects(),
       questions: recentQuestions(),
@@ -499,6 +500,7 @@ const server = http.createServer((req, res) => {
         if ('model' in body) patch.model = String(body.model);
         if ('effort' in body) patch.effort = String(body.effort);
         if ('ackText' in body) patch.ackText = String(body.ackText);
+        if ('context' in body) patch.context = String(body.context);
         const next = writeSettings(patch);
         console.log(
           `réglages : traitement ${next.autorun === false ? 'manuel' : 'automatique'},` +
