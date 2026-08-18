@@ -13,6 +13,7 @@ const SWEEP_MS = 3000;
 // Conteneurs de message, du plus spécifique au plus générique.
 const MESSAGE_CONTAINERS = [
   '[data-tid="chat-pane-message"]',
+  '[data-tid="chat-pane-item"]',
   '[data-tid="message-pane-item"]',
   '.fui-ChatMessage',
   '.fui-ChatMyMessage',
@@ -23,6 +24,7 @@ const MESSAGE_CONTAINERS = [
 const BODY_SELECTORS = [
   '[data-tid="message-body-content"]',
   '[data-tid="messageBodyContent"]',
+  '[id^="content-"]', // teams.cloud.microsoft : #content-<id du message>
   '.fui-ChatMessage__body',
   '.fui-ChatMyMessage__body',
 ];
@@ -98,18 +100,44 @@ function textOf(el) {
 }
 
 /**
- * Nom du canal / de la conversation ouverte. Teams l'expose de trois façons selon
- * les versions : en-tête, URL (canaux d'équipe) et titre de l'onglet.
+ * Nom de la conversation ouverte, pour l'affichage. Le premier en-tête trouvé fait
+ * foi ; à défaut on retombe sur l'URL puis le titre de l'onglet.
  */
 function currentChannel() {
   for (const sel of CHANNEL_HEADER) {
     const el = document.querySelector(sel);
     const t = el ? textOf(el) : '';
-    if (t) return t;
+    if (t && t.length < 120) return t;
   }
   const fromUrl = decodeURIComponent(location.href).match(/\/(?:channel|conversations)\/[^/]+\/([^?#/]+)/);
   if (fromUrl) return fromUrl[1];
   return (document.title || '').split('|')[0].trim();
+}
+
+/**
+ * Tous les endroits où Teams peut écrire le nom de la conversation ouverte. Aucun
+ * n'est fiable seul : selon la version, l'en-tête n'est pas balisé, le titre de
+ * l'onglet dit juste « Conversation », et l'URL ne contient qu'un identifiant. On
+ * les concatène et le filtre cherche le canal dans cet ensemble.
+ */
+function channelHints() {
+  const bits = [currentChannel(), document.title, decodeURIComponent(location.href)];
+
+  // L'entrée sélectionnée dans la liste latérale porte le nom du canal courant.
+  for (const sel of ['[aria-selected="true"]', '[aria-current="page"]', '[data-tid="channel-list-item-selected"]']) {
+    for (const el of document.querySelectorAll(sel)) {
+      const t = textOf(el);
+      if (t && t.length < 120) bits.push(t);
+    }
+  }
+
+  // Le panneau de messages est souvent étiqueté avec le nom de la conversation.
+  for (const el of document.querySelectorAll('[data-tid="message-pane-list-runway"], [data-tid="chat-pane-list"], main, [role="main"]')) {
+    const label = el.getAttribute('aria-label');
+    if (label && label.length < 120) bits.push(label);
+  }
+
+  return bits.filter(Boolean).join(' § ');
 }
 
 /**
@@ -305,8 +333,12 @@ function scan() {
   const tag = (cfg.trigger || '#claude').toLowerCase();
   const priming = Date.now() < state.primedUntil;
   const channel = currentChannel();
+  const hints = channelHints();
 
-  if (!channelAllowed(`${channel} ${location.href}`, cfg.channels)) return;
+  if (!channelAllowed(hints, cfg.channels)) {
+    log('conversation hors périmètre', channel, '| indices :', hints.slice(0, 200));
+    return;
+  }
 
   // Dans un canal dédié, le tag peut être facultatif : tout ce qui y est posté
   // est pour moi.
@@ -530,8 +562,9 @@ function pollOutbox() {
     for (const reply of res.replies) {
       if (state.prepared.has(reply.id)) continue;
       // Une réponse qui vise un canal précis n'est déposée que dans ce canal.
-      if (reply.channel && !channelAllowed(`${channel} ${location.href}`, [reply.channel])) continue;
-      if (!reply.channel && !channelAllowed(`${channel} ${location.href}`, cfg.channels)) continue;
+      const hints = channelHints();
+      if (reply.channel && !channelAllowed(hints, [reply.channel])) continue;
+      if (!reply.channel && !channelAllowed(hints, cfg.channels)) continue;
       prepareReply(reply);
       break; // une seule à la fois, pour ne pas empiler dans la zone de saisie
     }
