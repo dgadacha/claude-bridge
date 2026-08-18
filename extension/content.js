@@ -108,11 +108,26 @@ function currentChannel() {
   return (document.title || '').split('|')[0].trim();
 }
 
+/**
+ * « Claude Bridge », « claude-bridge », « Claude_Bridge » : Teams affiche le nom du
+ * canal tel qu'il a été saisi, on compare donc sur une forme normalisée.
+ */
+function normalize(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
 /** Aucun canal configuré = on écoute partout. */
 function channelAllowed(haystack, channels) {
   if (!channels || channels.length === 0) return true;
-  const h = String(haystack || '').toLowerCase();
-  return channels.some((c) => h.includes(String(c).toLowerCase().trim()));
+  const h = normalize(haystack);
+  return channels.some((c) => {
+    const needle = normalize(c);
+    return needle && h.includes(needle);
+  });
 }
 
 function findContainer(node) {
