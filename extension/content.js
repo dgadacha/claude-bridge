@@ -206,18 +206,28 @@ function pick(container, selectors) {
 // Les boutons de la barre d'action d'un message portent eux aussi un aria-label.
 const ACTION_LABEL = /option|r[ée]agir|r[ée]pondre|react|reply|more|menu|modifier|supprimer|transf[ée]rer|forward|delete|edit|enregistrer|save|traduire|translate|[ée]pingler|pin/i;
 
+// Teams étiquette un message « Nom, 16:16 » ou « Nom, il y a 2 minutes » : un nom,
+// une virgule, puis un repère de temps qui contient toujours un chiffre.
+const AUTHORED_LABEL = /^([^,\n]{2,60}),\s*[^,\n]*\d/;
+
 /** Dernier recours : Teams met souvent "Nom, date heure" dans un aria-label. */
-function authorFromAria(container) {
+function authorFromAria(container, body = '') {
   const candidates = container.matches('[aria-label]')
     ? [container, ...container.querySelectorAll('[aria-label]')]
     : Array.from(container.querySelectorAll('[aria-label]'));
 
+  const corps = normalize(body);
   for (const el of candidates) {
     if (el.closest('button, a, [role="button"], [role="menu"], [role="menuitem"], [role="toolbar"]')) continue;
     const label = el.getAttribute('aria-label') || '';
     if (!label || ACTION_LABEL.test(label)) continue;
-    const first = label.split(',')[0].trim();
-    if (first.length > 1 && first.length < 80) return first;
+
+    const named = label.match(AUTHORED_LABEL);
+    if (!named) continue;
+    const nom = named[1].trim();
+    // Certaines versions reprennent le texte du message dans l'étiquette.
+    if (!nom || (corps && normalize(nom) && corps.includes(normalize(nom)))) continue;
+    return nom;
   }
   return '';
 }
@@ -256,7 +266,10 @@ function extract(container) {
     if (!hasImage) return null;
     body = '(capture d\'écran)';
   }
-  const author = pick(container, AUTHOR_SELECTORS) || authorFromAria(container);
+  // Teams n'affiche pas de nom sur ses propres messages.
+  const mine = container.closest('.fui-ChatMyMessage, [class*="ChatMyMessage"]');
+  const author =
+    pick(container, AUTHOR_SELECTORS) || authorFromAria(container, body) || (mine ? 'moi' : '');
   return { author, body, id: messageId(container, body), ts: timestampOf(container) };
 }
 

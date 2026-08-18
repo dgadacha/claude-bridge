@@ -19,6 +19,8 @@ body{font:14px system-ui;background:#16181d;color:#e7e9ee;padding:16px;display:f
 const captures = [];
 window.chrome = {
   runtime: {
+    id: 'harness',                      // sert au test de contexte vivant
+    onMessage: { addListener() {} },    // dépôt des réponses déclenché depuis le popup
     lastError: null,
     sendMessage(msg, cb) {
       if (msg.type === 'get-config') return cb({ enabled:true, trigger:'#claude', sound:false, debug:true, watchList:true, maxAgeMin:15, channels:['claude-bridge'], requireTag:false, autoSend:false, images:true });
