@@ -102,6 +102,14 @@ setTimeout(() => {
   addListItem('claude-bridge — Marc Dupont, 14:32, #claude #monapp le scraper tourne toujours ?');
   addListItem('Général — Sophie Martin, 14:35, #claude #optic message dans un autre canal');
 }, 7000);
+// Éditeur récalcitrant : comme Teams quand le document n'a pas le focus,
+// execCommand ne produit rien et seul le collage fonctionne.
+document.execCommand = () => true;
+document.getElementById('box').addEventListener('paste', (e) => {
+  const texte = e.clipboardData.getData('text/plain');
+  if (texte) document.getElementById('box').textContent = texte;
+});
+
 // Ce que Teams ferait de la pièce jointe collée.
 window.__pasted = [];
 document.getElementById('box').addEventListener('paste', (e) => {

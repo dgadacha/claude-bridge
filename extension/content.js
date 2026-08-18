@@ -538,13 +538,39 @@ function attachFiles(target, files) {
   }
 }
 
+/**
+ * Insère le texte dans l'éditeur de Teams. Aucune méthode n'est fiable seule :
+ * execCommand ne fait rien si le document n'a pas le focus (console ouverte, autre
+ * fenêtre), et écrire dans le DOM ne prévient pas toujours l'éditeur. On essaie
+ * dans l'ordre et on vérifie à chaque fois que le texte est bien arrivé.
+ */
 function typeInto(box, text) {
+  const temoin = text.slice(0, 24);
+  const insere = () => textOf(box).includes(temoin);
+
   box.focus();
-  const ok = document.execCommand && document.execCommand('insertText', false, text);
-  if (!ok) {
-    box.textContent = text;
-    box.dispatchEvent(new InputEvent('input', { inputType: 'insertText', bubbles: true }));
+  try {
+    if (document.execCommand) document.execCommand('insertText', false, text);
+  } catch (e) {
+    log('execCommand refusé', e);
   }
+  if (insere()) return true;
+
+  // Teams gère le collage de texte brut, y compris déclenché par programme.
+  try {
+    const dt = new DataTransfer();
+    dt.setData('text/plain', text);
+    box.dispatchEvent(
+      new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })
+    );
+  } catch (e) {
+    log('collage refusé', e);
+  }
+  if (insere()) return true;
+
+  box.textContent = text;
+  box.dispatchEvent(new InputEvent('input', { inputType: 'insertText', bubbles: true }));
+  return insere();
 }
 
 /** Marque la réponse envoyée au premier clic sur Envoyer (ou à l'Entrée). */
@@ -571,6 +597,7 @@ function watchForSend(replyId, box) {
  * jointes comprises. L'envoi reste manuel sauf si `autoSend` est activé.
  */
 async function prepareReply(reply) {
+  log('dépôt de la réponse', reply.id);
   const box = composeBox();
   if (!box) return log('zone de saisie introuvable, réponse laissée en attente');
   if (textOf(box)) return log('zone de saisie occupée, réponse laissée en attente');
@@ -580,8 +607,11 @@ async function prepareReply(reply) {
   );
   if (!full || full.error) return log('réponse illisible', full && full.error);
 
+  // Tant que le texte n'est pas dans l'éditeur, la réponse reste à déposer.
+  if (!typeInto(box, full.text)) {
+    return log("l'éditeur a refusé le texte, réponse laissée en attente", reply.id);
+  }
   state.prepared.add(reply.id);
-  typeInto(box, full.text);
 
   const files = (full.attachments || [])
     .filter((a) => a.base64)
@@ -609,14 +639,23 @@ function pollOutbox() {
   if (!cfg || !cfg.enabled) return;
   if (!bridgeAlive()) return stopBridge();
   chrome.runtime.sendMessage({ type: 'check-outbox' }, (res) => {
-    if (chrome.runtime.lastError || !res || !res.replies) return;
-    const channel = currentChannel();
+    if (chrome.runtime.lastError) return log('file inaccessible', chrome.runtime.lastError.message);
+    if (!res || !res.replies) return log('file : réponse vide du service worker', res);
+    if (res.replies.length === 0) return;
+
+    log('file :', res.replies.length, 'réponse(s) en attente');
+    const hints = channelHints();
     for (const reply of res.replies) {
-      if (state.prepared.has(reply.id)) continue;
+      if (state.prepared.has(reply.id)) {
+        log('réponse déjà déposée', reply.id);
+        continue;
+      }
       // Une réponse qui vise un canal précis n'est déposée que dans ce canal.
-      const hints = channelHints();
-      if (reply.channel && !channelAllowed(hints, [reply.channel])) continue;
-      if (!reply.channel && !channelAllowed(hints, cfg.channels)) continue;
+      const wanted = reply.channel ? [reply.channel] : cfg.channels;
+      if (!channelAllowed(hints, wanted)) {
+        log('réponse pour un autre canal', reply.id, wanted, '| ici :', currentChannel());
+        continue;
+      }
       prepareReply(reply);
       break; // une seule à la fois, pour ne pas empiler dans la zone de saisie
     }
