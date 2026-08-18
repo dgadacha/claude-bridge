@@ -120,10 +120,23 @@ window.__pasted = [];
 document.getElementById('box').addEventListener('paste', (e) => {
   window.__pasted.push(...Array.from(e.clipboardData.files).map((f) => `${f.name} (${f.type}, ${f.size}o)`));
 });
+// Mode enrichi : le bouton d'envoi disparaît, Entrée saute une ligne, seul
+// Cmd/Ctrl+Entrée envoie. C'est l'état dans lequel Teams bascule après un collage
+// de plusieurs paragraphes.
+window.__modeEnrichi = false;
+box.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const envoie = window.__modeEnrichi ? (e.metaKey || e.ctrlKey) : !e.shiftKey;
+  if (!envoie) return;
+  box.dataset.accepte = '0';
+  box.textContent = '';
+  window.__envoye = 'clavier';
+});
 document.getElementById('sendBtn').addEventListener('click', () => {
+  if (window.__modeEnrichi) return;   // en mode enrichi ce bouton n'existe plus
   box.dataset.accepte = '0';
   box.textContent = '';           // Teams vide la zone quand le message part
-  window.__envoye = true;
+  window.__envoye = 'bouton';
 });
 document.getElementById('switch').addEventListener('click', () => {
   document.getElementById('chan').textContent = 'général';

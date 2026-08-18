@@ -75,17 +75,26 @@ const COMPOSE_BOX = [
   'div[role="textbox"][contenteditable="true"]',
 ];
 
+// L'envoi peut être un bouton ou un simple élément cliquable, selon que Teams est en
+// message simple ou en message enrichi (barre de mise en forme, objet, Entrée = saut
+// de ligne). Le mode enrichi s'active dès qu'on colle un texte à plusieurs paragraphes.
 const SEND_BUTTON = [
   '[data-tid="sendMessageCommands"] button',
   '[data-tid="newMessageCommandBar-send"]',
-  'button[data-tid*="send" i]',
   '[data-tid="send-message-button"]',
+  '[data-tid*="send" i][role="button"]',
+  'button[data-tid*="send" i]',
   'button[name="send"]',
+  '[aria-label*="Envoyer" i][role="button"]',
   'button[aria-label*="Envoyer" i]',
   'button[title*="Envoyer" i]',
+  '[aria-label*="Send" i][role="button"]',
   'button[aria-label*="Send" i]',
   'button[title*="Send" i]',
 ];
+
+// Les autres actions de la barre portent aussi des libellés : ne pas les confondre.
+const NOT_SEND = /joindre|attach|emoji|gif|sticker|format|mention|praise|loop|copilot|enregistr|record|supprim|delete|priorit|planifi|schedule|dicter|dictate/i;
 
 const state = {
   config: null,
@@ -504,8 +513,12 @@ function composeBox() {
 
 function sendButton() {
   for (const sel of SEND_BUTTON) {
-    const el = document.querySelector(sel);
-    if (el && !el.disabled) return el;
+    for (const el of document.querySelectorAll(sel)) {
+      if (el.disabled || el.getAttribute('aria-disabled') === 'true') continue;
+      const label = `${el.getAttribute('aria-label') || ''} ${el.getAttribute('title') || ''} ${el.getAttribute('data-tid') || ''}`;
+      if (NOT_SEND.test(label)) continue;
+      return el;
+    }
   }
   return null;
 }
@@ -655,8 +668,11 @@ async function prepareReply(reply) {
   }
 }
 
-/** Entrée sans Maj : le raccourci d'envoi de Teams, si le bouton reste introuvable. */
-function pressEnter(box) {
+/**
+ * Entrée envoie en message simple ; en message enrichi, Entrée saute une ligne et
+ * c'est Cmd/Ctrl+Entrée qui envoie.
+ */
+function pressEnter(box, modificateur = false) {
   for (const type of ['keydown', 'keypress', 'keyup']) {
     box.dispatchEvent(
       new KeyboardEvent(type, {
@@ -664,6 +680,8 @@ function pressEnter(box) {
         code: 'Enter',
         keyCode: 13,
         which: 13,
+        metaKey: modificateur,
+        ctrlKey: modificateur,
         bubbles: true,
         cancelable: true,
       })
@@ -677,21 +695,39 @@ function pressEnter(box) {
  * et le message reste dans la zone, prêt à être envoyé à la main.
  */
 async function autoSend(reply, box) {
-  const btn = sendButton();
-  if (btn) btn.click();
-  else {
-    log('bouton Envoyer introuvable, tentative avec Entrée');
-    box.focus();
-    pressEnter(box);
+  const parti = () => !textOf(box);
+  const apres = (ms) => new Promise((r) => setTimeout(() => r(parti()), ms));
+
+  const tentatives = [
+    () => {
+      const btn = sendButton();
+      if (!btn) return false;
+      btn.click();
+      return true;
+    },
+    () => {
+      box.focus();
+      pressEnter(box);
+      return true;
+    },
+    // Message enrichi : Entrée saute une ligne, l'envoi se fait au modificateur.
+    () => {
+      box.focus();
+      pressEnter(box, true);
+      return true;
+    },
+  ];
+
+  for (const [i, tentative] of tentatives.entries()) {
+    if (!tentative()) continue;
+    if (await apres(i === 0 ? 1200 : 700)) {
+      log('réponse envoyée automatiquement', reply.id, `(méthode ${i + 1})`);
+      chrome.runtime.sendMessage({ type: 'reply-sent', id: reply.id }, () => {});
+      return;
+    }
   }
 
-  const parti = await new Promise((resolve) => setTimeout(() => resolve(!textOf(box)), 1200));
-  if (parti) {
-    log('réponse envoyée automatiquement', reply.id);
-    chrome.runtime.sendMessage({ type: 'reply-sent', id: reply.id }, () => {});
-  } else {
-    log("l'envoi automatique n'a pas abouti, le message attend dans la zone de saisie");
-  }
+  log("l'envoi automatique n'a pas abouti, le message attend dans la zone de saisie");
 }
 
 function pollOutbox() {
