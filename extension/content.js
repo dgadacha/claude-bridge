@@ -544,17 +544,39 @@ function attachFiles(target, files) {
  * fenêtre), et écrire dans le DOM ne prévient pas toujours l'éditeur. On essaie
  * dans l'ordre et on vérifie à chaque fois que le texte est bien arrivé.
  */
-function typeInto(box, text) {
+/** Le texte a-t-il survécu au rendu suivant de l'éditeur ? */
+function tient(verifie) {
+  return new Promise((resolve) => setTimeout(() => resolve(verifie()), 250));
+}
+
+/**
+ * Insère le texte dans l'éditeur de Teams. On place d'abord le curseur dans la zone,
+ * puis on essaie la frappe simulée et le collage. Chaque tentative est vérifiée après
+ * un rendu : écrire directement dans le DOM « réussirait » toujours, mais l'éditeur
+ * réécrit son contenu et le texte disparaît.
+ */
+async function typeInto(box, text) {
   const temoin = text.slice(0, 24);
   const insere = () => textOf(box).includes(temoin);
 
   box.focus();
   try {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(box);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  } catch (e) {
+    log('curseur non plaçable', e);
+  }
+
+  try {
     if (document.execCommand) document.execCommand('insertText', false, text);
   } catch (e) {
     log('execCommand refusé', e);
   }
-  if (insere()) return true;
+  if (await tient(insere)) return true;
 
   // Teams gère le collage de texte brut, y compris déclenché par programme.
   try {
@@ -566,11 +588,7 @@ function typeInto(box, text) {
   } catch (e) {
     log('collage refusé', e);
   }
-  if (insere()) return true;
-
-  box.textContent = text;
-  box.dispatchEvent(new InputEvent('input', { inputType: 'insertText', bubbles: true }));
-  return insere();
+  return tient(insere);
 }
 
 /** Marque la réponse envoyée au premier clic sur Envoyer (ou à l'Entrée). */
@@ -597,6 +615,12 @@ function watchForSend(replyId, box) {
  * jointes comprises. L'envoi reste manuel sauf si `autoSend` est activé.
  */
 async function prepareReply(reply) {
+  // L'éditeur n'accepte de texte que si la fenêtre a réellement le focus : onglet en
+  // arrière-plan ou console ouverte, l'insertion est silencieusement perdue.
+  if (!document.hasFocus()) {
+    return log('onglet Teams pas au premier plan, dépôt reporté', reply.id);
+  }
+
   log('dépôt de la réponse', reply.id);
   const box = composeBox();
   if (!box) return log('zone de saisie introuvable, réponse laissée en attente');
@@ -608,7 +632,7 @@ async function prepareReply(reply) {
   if (!full || full.error) return log('réponse illisible', full && full.error);
 
   // Tant que le texte n'est pas dans l'éditeur, la réponse reste à déposer.
-  if (!typeInto(box, full.text)) {
+  if (!(await typeInto(box, full.text))) {
     return log("l'éditeur a refusé le texte, réponse laissée en attente", reply.id);
   }
   state.prepared.add(reply.id);
@@ -670,6 +694,9 @@ function start(config) {
     subtree: true,
     characterData: true,
   });
+  // Le dépôt exige le focus : on retente dès que la fenêtre le récupère.
+  window.addEventListener('focus', () => setTimeout(pollOutbox, 300));
+
   state.timers.push(
     setInterval(() => {
       scan();

@@ -160,10 +160,15 @@ Construire un livrable à joindre :
 ./bin/zip-plugin.sh /chemin/vers/le/projet mon-plugin-1.4.2 --exclude 'tests/*'
 ```
 
-La réponse apparaît dans le popup de l'extension et, dès que l'onglet Teams est sur le
-bon canal, texte et pièce jointe sont déposés dans la zone de saisie. **Un brouillon en
-cours de frappe n'est jamais écrasé** : la réponse reste en attente et un bouton du
-popup la place quand la zone est libre.
+La réponse apparaît dans les réglages de l'extension et se dépose dans la zone de
+saisie dès que trois conditions sont réunies : l'onglet Teams est **sur le bon canal**,
+il est **au premier plan**, et la zone de saisie est **vide**. La deuxième n'est pas un
+choix : l'éditeur de Teams ignore silencieusement toute insertion quand la fenêtre n'a
+pas le focus. La réponse patiente donc jusqu'à ce que vous reveniez sur l'onglet — ce
+que vous feriez de toute façon pour la relire. Un brouillon en cours de frappe n'est
+jamais écrasé.
+
+La capture des questions, elle, fonctionne en arrière-plan.
 
 ## Garde-fous
 

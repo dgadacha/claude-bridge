@@ -104,10 +104,15 @@ setTimeout(() => {
 }, 7000);
 // Éditeur récalcitrant : comme Teams quand le document n'a pas le focus,
 // execCommand ne produit rien et seul le collage fonctionne.
-document.execCommand = () => true;
+document.execCommand = () => true; // comme Teams sans focus : sans effet
+// L'éditeur réécrit son contenu : une écriture DOM directe ne survit pas.
+const box = document.getElementById('box');
+new MutationObserver(() => {
+  if (box.dataset.accepte !== '1' && box.textContent) box.textContent = '';
+}).observe(box, { childList: true, characterData: true, subtree: true });
 document.getElementById('box').addEventListener('paste', (e) => {
   const texte = e.clipboardData.getData('text/plain');
-  if (texte) document.getElementById('box').textContent = texte;
+  if (texte) { box.dataset.accepte = '1'; box.textContent = texte; }
 });
 
 // Ce que Teams ferait de la pièce jointe collée.
