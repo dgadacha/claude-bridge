@@ -88,8 +88,30 @@ const state = {
   seen: new Set(),
   primedUntil: Date.now() + PRIME_MS,
   scanTimer: null,
+  timers: [],
+  stopped: false,
   prepared: new Set(), // réponses déjà déposées dans la zone de saisie
 };
+
+/**
+ * Recharger l'extension coupe le lien avec les scripts déjà injectés. Plutôt que
+ * de laisser chaque appel échouer bruyamment, on s'arrête et on le dit une fois.
+ */
+function bridgeAlive() {
+  try {
+    return Boolean(chrome.runtime && chrome.runtime.id);
+  } catch {
+    return false;
+  }
+}
+
+function stopBridge() {
+  if (state.stopped) return;
+  state.stopped = true;
+  state.timers.forEach(clearInterval);
+  clearTimeout(state.scanTimer);
+  console.info('[claude-bridge] extension rechargée — recharge cet onglet Teams pour reprendre.');
+}
 
 function log(...args) {
   if (state.config && state.config.debug) console.log('[claude-bridge]', ...args);
@@ -328,6 +350,7 @@ async function collectImages(container) {
 }
 
 function send(payload) {
+  if (!bridgeAlive()) return stopBridge();
   chrome.runtime.sendMessage({ type: 'teams-message', payload }, (res) => {
     if (chrome.runtime.lastError) return;
     if (res && res.accepted) log('capture acceptée', res);
@@ -337,6 +360,7 @@ function send(payload) {
 function scan() {
   const cfg = state.config;
   if (!cfg || !cfg.enabled) return;
+  if (!bridgeAlive()) return stopBridge();
 
   const tag = (cfg.trigger || '#claude').toLowerCase();
   const priming = Date.now() < state.primedUntil;
@@ -406,6 +430,7 @@ function scan() {
 function scanChatList() {
   const cfg = state.config;
   if (!cfg || !cfg.enabled || cfg.watchList === false) return;
+  if (!bridgeAlive()) return stopBridge();
   const tag = (cfg.trigger || '#claude').toLowerCase();
 
   for (const sel of CHAT_LIST_ITEMS) {
@@ -569,6 +594,7 @@ async function prepareReply(reply) {
 function pollOutbox() {
   const cfg = state.config;
   if (!cfg || !cfg.enabled) return;
+  if (!bridgeAlive()) return stopBridge();
   chrome.runtime.sendMessage({ type: 'check-outbox' }, (res) => {
     if (chrome.runtime.lastError || !res || !res.replies) return;
     const channel = currentChannel();
@@ -592,11 +618,13 @@ function start(config) {
     subtree: true,
     characterData: true,
   });
-  setInterval(() => {
-    scan();
-    scanChatList();
-  }, SWEEP_MS);
-  setInterval(pollOutbox, OUTBOX_POLL_MS);
+  state.timers.push(
+    setInterval(() => {
+      scan();
+      scanChatList();
+    }, SWEEP_MS),
+    setInterval(pollOutbox, OUTBOX_POLL_MS)
+  );
   setTimeout(pollOutbox, 2000);
   queueScan();
 }
